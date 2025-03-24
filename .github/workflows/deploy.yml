@@ -40,7 +40,7 @@ jobs:
 
             echo "🔐 SSH into EC2 success!"
 
-            cd /path/to/project  # <-- change this to your actual app folder
+            cd /data/my-fullstack-app # <-- change this to your actual app folder
 
             echo "📥 Pulling latest code..."
             git pull origin main
