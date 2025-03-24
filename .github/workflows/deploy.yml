@@ -1,0 +1,38 @@
+name: Deploy App on Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - dev
+
+jobs:
+  deploy:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BASTION_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.BASTION_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o ProxyCommand="ssh -i ~/.ssh/id_rsa -W %h:%p ubuntu@${{ secrets.BASTION_HOST }}" \
+              -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PRIVATE_IP }} << 'EOF'
+            cd /path/to/project
+
+            git pull origin main
+
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
+
+            docker compose down
+            docker compose up --build -d
+          EOF
