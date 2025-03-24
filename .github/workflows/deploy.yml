@@ -31,21 +31,29 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.BASTION_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.BASTION_HOST }} >> ~/.ssh/known_hosts
+
+          # ✅ Add bastion and EC2 host keys (optional if using StrictHostKeyChecking=no)
+          ssh-keyscan -H ${{ secrets.BASTION_HOST }} >> ~/.ssh/known_hosts || true
+          ssh-keyscan -H ${{ secrets.EC2_PRIVATE_IP }} >> ~/.ssh/known_hosts || true
 
       - name: Deploy to EC2 via Bastion
         run: |
-          ssh -o ProxyCommand="ssh -i ~/.ssh/id_rsa -W %h:%p ec2-user@${{ secrets.BASTION_HOST }}" \
-              -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_PRIVATE_IP }} << 'EOF'
+          ssh \
+            -o StrictHostKeyChecking=no \
+            -o LogLevel=ERROR \
+            -o ProxyCommand="ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o LogLevel=ERROR -W %h:%p ec2-user@${{ secrets.BASTION_HOST }}" \
+            -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_PRIVATE_IP }} << 'EOF'
+            
+            set -e  # Exit on any error
 
             echo "🔐 SSH into EC2 success!"
 
-            cd /data/my-fullstack-app # <-- change this to your actual app folder
+            cd /data/my-fullstack-app
 
             echo "📥 Pulling latest code..."
             git pull origin main
 
-            echo "🔧 Setting environment variables..."
+            echo "🔧 Writing environment config..."
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
 
             echo "🐳 Restarting with Docker Compose..."
@@ -54,3 +62,4 @@ jobs:
 
             echo "✅ Deployment completed!"
           EOF
+
