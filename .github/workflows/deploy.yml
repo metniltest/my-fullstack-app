@@ -1,6 +1,10 @@
 name: Deploy App on Merge
 
 on:
+  push:
+    branches:
+      - main
+      - dev
   pull_request:
     types: [closed]
     branches:
@@ -9,10 +13,15 @@ on:
 
 jobs:
   deploy:
-    if: github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true || github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
+      - name: Debug trigger info
+        run: |
+          echo "Merged: ${{ github.event.pull_request.merged }}"
+          echo "Branch: ${{ github.ref }}"
+
       - name: Checkout Code
         uses: actions/checkout@v3
 
@@ -28,11 +37,8 @@ jobs:
           ssh -o ProxyCommand="ssh -i ~/.ssh/id_rsa -W %h:%p ubuntu@${{ secrets.BASTION_HOST }}" \
               -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PRIVATE_IP }} << 'EOF'
             cd /path/to/project
-
             git pull origin main
-
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
-
             docker compose down
             docker compose up --build -d
           EOF
