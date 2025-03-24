@@ -21,24 +21,36 @@ jobs:
         run: |
           echo "Merged: ${{ github.event.pull_request.merged }}"
           echo "Branch: ${{ github.ref }}"
+          echo "Event: ${{ github.event_name }}"
 
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Setup SSH
+      - name: Setup SSH for Bastion Access
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.BASTION_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.BASTION_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to EC2
+      - name: Deploy to EC2 via Bastion
         run: |
-          ssh -o ProxyCommand="ssh -i ~/.ssh/id_rsa -W %h:%p ubuntu@${{ secrets.BASTION_HOST }}" \
-              -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_PRIVATE_IP }} << 'EOF'
-            cd /path/to/project
+          ssh -o ProxyCommand="ssh -i ~/.ssh/id_rsa -W %h:%p ec2-user@${{ secrets.BASTION_HOST }}" \
+              -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_PRIVATE_IP }} << 'EOF'
+
+            echo "🔐 SSH into EC2 success!"
+
+            cd /path/to/project  # <-- change this to your actual app folder
+
+            echo "📥 Pulling latest code..."
             git pull origin main
+
+            echo "🔧 Setting environment variables..."
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
+
+            echo "🐳 Restarting with Docker Compose..."
             docker compose down
             docker compose up --build -d
+
+            echo "✅ Deployment completed!"
           EOF
